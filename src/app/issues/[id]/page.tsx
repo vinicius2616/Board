@@ -1,13 +1,11 @@
-import { Input } from "@/components/input";
-import { Skeleton } from "@/components/skeleton";
+import { createComment } from "@/http/create-comment";
 import { getIssue } from "@/http/get-issue";
-import { ArchiveIcon, MessageCirclePlusIcon, MoveLeftIcon } from "lucide-react";
+import { authClient } from "@/lib/auth-client";
+import { MoveLeftIcon } from "lucide-react";
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
-import { Suspense } from "react";
-import { IssueCommentsList } from "./issue-comments/issue-coments-list";
-import { IssueCommentsSkeleton } from "./issue-comments/issue-coments-skeleton";
-import { IssueLikeButton } from "./issue-like-button";
+import { IssueDetails } from "./issue-details";
 
 interface IssuePageProps {
   params: Promise<{ id: string }>;
@@ -35,7 +33,21 @@ export const generateMetadata = async ({
 export default async function IssuePage({ params }: IssuePageProps) {
   const { id } = await params;
 
+  const { data: session } = await authClient.getSession({
+    fetchOptions: {
+      headers: await headers(),
+    },
+  });
+
   const issue = await getIssue({ id });
+
+  const isAuthenticated = !!session?.user;
+
+  async function handleCreateComment(text: string) {
+    "use server";
+
+    await createComment({ issueId: id, text });
+  }
 
   return (
     <main className="max-w-[900px] mx-auto w-full flex flex-col gap-4 p-6 bg-navy-800 border-[0.5px] border-navy-500 rounded-xl">
@@ -47,47 +59,7 @@ export default async function IssuePage({ params }: IssuePageProps) {
         <span className="text-xs">Back to board</span>
       </Link>
 
-      <div className="flex items-center gap-2">
-        <span className="bg-navy-700 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs">
-          <ArchiveIcon className="size-3" />
-          {statusLabels[issue.status]}
-        </span>
-
-        <Suspense fallback={<Skeleton className="h-7 w-16" />}>
-          <IssueLikeButton issueId={issue.id} />
-        </Suspense>
-      </div>
-
-      <div className="space-y-2">
-        <h1 className="font-semibold text-2xl">{issue.title}</h1>
-        <p className="text-navy-100 text-sm leading-relaxed">
-          {issue.description}
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <span className="font-semibold">Comments</span>
-
-        <form className="relative w-full">
-          <Input
-            className="bg-navy-700 h-11 pr-24 w-full"
-            placeholder="Leave a comment..."
-          />
-          <button
-            type="submit"
-            className="flex items-center gap-2 text-indigo-400 absolute right-3 top-1/2 -translate-y-1/2 text-xs hover:text-indigo-300 cursor-pointer disabled:opacity-50"
-          >
-            Publish
-            <MessageCirclePlusIcon className="size-3" />
-          </button>
-        </form>
-
-        <div className="mt-3">
-          <Suspense fallback={<IssueCommentsSkeleton />}>
-            <IssueCommentsList issueId={issue.id} />
-          </Suspense>
-        </div>
-      </div>
+      <IssueDetails issueId={id} />
     </main>
   );
 }
